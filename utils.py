@@ -1,5 +1,5 @@
 # from google.colab import files
-import cv2
+import cv2 as cv
 
 import numpy as np
 from PIL import Image
@@ -30,7 +30,7 @@ def folderDownload(folder_path):
 
 
 def arrayToImg(array, dispaly_img=False):
-    img = cv2.cvtColor(array, cv2.COLOR_BGR2RGB)
+    img = cv.cvtColor(array, cv.COLOR_BGR2RGB)
     img = Image.fromarray(img)
     if dispaly_img:
         d.update(img)
@@ -38,7 +38,7 @@ def arrayToImg(array, dispaly_img=False):
 
 
 def videoImgGenerator(video_path, framerate=30):
-    cap = cv2.VideoCapture(video_path)
+    cap = cv.VideoCapture(video_path)
     ret = True
     c = 0
     while True:
@@ -51,19 +51,19 @@ def videoImgGenerator(video_path, framerate=30):
             ret, frame = cap.read()
             if not ret:
                 break
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            rgb_frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
 
             yield rgb_frame
 
     cap.release()
-    cv2.destroyAllWindows()
+    cv.destroyAllWindows()
 
 
 def squareAspect(image, side_len=512):
     # modified from [https://note.nkmk.me/en/python-pillow-add-margin-expand-canvas/]
     h, w, _ = image.shape
 
-    image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    image = Image.fromarray(cv.cvtColor(image, cv.COLOR_BGR2RGB))
 
     if w > h:
         result = Image.new(image.mode, (w, w), (0, 0, 0))
@@ -75,7 +75,12 @@ def squareAspect(image, side_len=512):
         image = result
     image = image.resize((side_len, side_len))
 
-    bgr_nparray = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    bgr_nparray = cv.cvtColor(np.array(image), cv.COLOR_RGB2BGR)
 
-    return cv2.cvtColor(bgr_nparray, cv2.COLOR_BGR2RGB)
+    return cv.cvtColor(bgr_nparray, cv.COLOR_BGR2RGB)
 
+
+def saveIMG(image, name, save_path):
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    cv.imwrite(os.path.join(save_path, name), image)

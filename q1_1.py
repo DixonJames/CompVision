@@ -63,7 +63,7 @@ def get_outputs(image, model, threshold):
     # index of those labels wich are labeled people
     thresholded_preds_inidices = [scores.index(i) for i in scores if i > threshold]
 
-    #preds_inidices = list(set(thresholded_preds_inidices).intersection(set(person_preds_inidices)))
+    # preds_inidices = list(set(thresholded_preds_inidices).intersection(set(person_preds_inidices)))
     preds_inidices = [scores.index(i) for i in scores if scores.index(i) in person_preds_inidices][:1]
     preds_count = len(list(preds_inidices))
 
@@ -128,9 +128,12 @@ if __name__ == '__main__':
     ])
     c = 0
     for file_loc in os.listdir(os.path.join(".", "Dataset", "Train")):
-        for video_file in os.listdir(os.path.join(".", "Dataset","Train",  file_loc)):
-            img_gen = videoImgGenerator(video_path=os.path.join(".", "Dataset", "Train", file_loc, video_file), framerate=30)
-            save_path = os.path.join(".", "Results", file_loc, video_file.split(".")[0].replace(" ", "_"))
+        for video_file in os.listdir(os.path.join(".", "Dataset", "Train", file_loc)):
+            img_gen = videoImgGenerator(video_path=os.path.join(".", "Dataset", "Train", file_loc, video_file),
+                                        framerate=15)
+
+            video_name = video_file.split(".")[0].replace(" ", "_")
+            save_path = os.path.join(".", "Results", "1_1", file_loc, video_name)
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
 
@@ -139,10 +142,9 @@ if __name__ == '__main__':
 
                 images = run(img, threshold=0.99)
 
-
                 if images is not None:
                     for i in range(len(images)):
-                        cv2.imwrite(os.path.join(save_path, f"test_{second}_{i}.jpg"), images[i])
+                        cv2.imwrite(os.path.join(save_path, f"{file_loc[0]}_{video_name}_{second}_{i}.jpg"), images[i])
 
                     second += 1
                     print(f"video: {video_file}, s:{second}")

@@ -133,7 +133,7 @@ if __name__ == '__main__':
                                         framerate=15)
 
             video_name = video_file.split(".")[0].replace(" ", "_")
-            save_path = os.path.join(".", "Results", "1_1", file_loc, video_name)
+            save_path = os.path.join(".", "Results", "1_1_edited", file_loc, video_name)
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
 

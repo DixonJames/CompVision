@@ -59,6 +59,10 @@ print(f"device: {device}")
 
 
 def createLabels():
+    """
+    creates labels.json file
+    :return:
+    """
     label_path = os.path.join("labels.json")
     if not os.path.exists(label_path):
         with open(label_path, "w") as file:
@@ -76,6 +80,12 @@ def createLabels():
 
 
 def poseImage(image, points):
+    """
+    creates the image with skeleton overlay
+    :param image:
+    :param points:
+    :return:
+    """
     for pair in POSE_PAIRS:
         partFrom = pair[0]
         partTo = pair[1]
@@ -97,6 +107,13 @@ def poseImage(image, points):
 
 
 def savePoints(point, name, save_path):
+    """
+    saves the points generated to points.json file
+    :param point:
+    :param name:
+    :param save_path:
+    :return:
+    """
     if not os.path.exists(save_path):
         with open(save_path, "w") as file:
             json.dump({}, file)
@@ -111,6 +128,11 @@ def savePoints(point, name, save_path):
 
 
 def poseEstimation():
+    """
+    goes though all the reults of part 1_1
+    finds the skeleton points of each
+    :return:
+    """
     p0 = os.path.join(".", "Results", "1_1_edited")
     folders = os.listdir(p0)
     folders.reverse()

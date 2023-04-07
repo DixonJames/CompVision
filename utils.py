@@ -59,7 +59,7 @@ def videoImgGenerator(video_path, framerate=30):
     cv.destroyAllWindows()
 
 
-def squareAspect(image, side_len=512):
+def squareAspect(image, height_len, side_len):
     # modified from [https://note.nkmk.me/en/python-pillow-add-margin-expand-canvas/]
     h, w, _ = image.shape
 
@@ -73,11 +73,9 @@ def squareAspect(image, side_len=512):
         result = Image.new(image.mode, (h, h), (0, 0, 0))
         result.paste(image, ((h - w) // 2, 0))
         image = result
-    image = image.resize((side_len, side_len))
+    image = image.resize((height_len, side_len))
 
-    bgr_nparray = cv.cvtColor(np.array(image), cv.COLOR_RGB2BGR)
-
-    return cv.cvtColor(bgr_nparray, cv.COLOR_BGR2RGB)
+    return np.array(image)
 
 
 def saveIMG(image, name, save_path):

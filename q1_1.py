@@ -38,6 +38,10 @@ model = torchvision.models.detection.maskrcnn_resnet50_fpn(weights=MaskRCNN_ResN
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.to(device).eval()
 
+HEIGHT = 720
+WIDTH = 1280
+
+
 
 def get_outputs(image, model, threshold):
     """
@@ -101,8 +105,8 @@ def draw_segmentation_map(image, masks, boxes, labels):
         masked_image = masked_image[boxes[i][0][1]:boxes[i][1][1], boxes[i][0][0]:boxes[i][1][0]]
 
         # fix the aspect ratio to a square for each
-        image = squareAspect(image)
-        masked_image = squareAspect(masked_image)
+        image = squareAspect(image, height_len=700, side_len=700)
+        masked_image = squareAspect(masked_image, height_len=700, side_len=700)
 
         images.append(cv2.cvtColor(masked_image, cv2.COLOR_BGR2RGB))
         """cv2.imwrite(f"test_{i}.jpg", cv2.cvtColor(masked_image, cv2.COLOR_BGR2RGB))
@@ -133,7 +137,7 @@ if __name__ == '__main__':
                                         framerate=15)
 
             video_name = video_file.split(".")[0].replace(" ", "_")
-            save_path = os.path.join(".", "Results", "1_1_edited", file_loc, video_name)
+            save_path = os.path.join(".", "Results", "1_1", file_loc, video_name)
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
 
@@ -142,9 +146,15 @@ if __name__ == '__main__':
 
                 images = run(img, threshold=0.99)
 
+
                 if images is not None:
                     for i in range(len(images)):
-                        cv2.imwrite(os.path.join(save_path, f"{file_loc[0]}_{video_name}_{second}_{i}.jpg"), images[i])
+                        base = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
+                        x_pos = (720 - 700) // 2
+                        y_pos = (1280 - 700) // 2
+                        base[x_pos:x_pos + 700, y_pos:y_pos + 700, :] = images[i]
+
+                        cv2.imwrite(os.path.join(save_path, f"{file_loc[0]}_{video_name}_{second}_{i}.jpg"), base)
 
                     second += 1
                     print(f"video: {video_file}, s:{second}")

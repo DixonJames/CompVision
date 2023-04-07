@@ -47,8 +47,9 @@ POSE_PAIRS = [["Neck", "RShoulder"], ["Neck", "LShoulder"], ["RShoulder", "RElbo
 
 body_parts_key = {"half": 0, "head": 1, "sit": 2, "stand": 3, "other": 4}
 
-inWidth = 512
-inHeight = 512
+inWidth = 1280
+inHeight = 720
+
 inScale = 0.003922
 threshold = 0.01
 
@@ -298,7 +299,6 @@ def testModel(network, test_dataset_loader, get_predictions=True):
 
             outputs = network(inputs)
 
-
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels.squeeze()).sum().item()
@@ -310,7 +310,7 @@ def testModel(network, test_dataset_loader, get_predictions=True):
     return 100 * correct / total, predictions
 
 
-def trainModel(network, optimizer, loss_func, train_dataset_loader, test_dataset_loader,  accuracy_stagnation=5):
+def trainModel(network, optimizer, loss_func, train_dataset_loader, test_dataset_loader, accuracy_stagnation=5):
     top_test_acc = 0.0
     test_stagnation = 0
     train_indicator = True
@@ -364,6 +364,7 @@ def trainModel(network, optimizer, loss_func, train_dataset_loader, test_dataset
 
     return top_test_acc, network
 
+
 def predictTest(model, testIterator, vector_key):
     _, predictions = testModel(network=model, test_dataset_loader=testIterator)
     results = pd.DataFrame(columns=["img", "prediction"])
@@ -381,34 +382,44 @@ def predictTest(model, testIterator, vector_key):
 def runPredictions():
     # create the points.json file of each of the joint locations (and optionally the images displaying them)
 
-    # poseEstimation()
+    poseEstimation()
 
     # creates the labels.json file (submitted with CW)
-    # this turned my manually labeled dataset of the images into labels to train on
+    # this tuned on my manually labeled dataset of the images into labels to train on
     # this doesn't have to be run when part of the submission as labels.json is already included in the submission.
 
-    # createLabels()
+    """createLabels()"""
 
     current_epoch = 0
 
     # create the dataset to train the model
+    """
     train_dataset_loader, test_dataset_loader, vector_key = getDataset("labels.json", "points.json")
+    """
 
     # create network
+    """
     network = ActionNetwork()
     network.to(device)
+    """
 
     # get loss function and optimiser
+    """
     loss_func = nn.CrossEntropyLoss()
     optimizer = optim.Adam(network.parameters(), lr=0.002, betas=(0.9, 0.999))
+    """
 
     # train model
+    """
     test_acc, model = trainModel(network, optimizer, loss_func,train_dataset_loader, test_dataset_loader, accuracy_stagnation=14)
+    """
 
     # predict all test set
+    """
     predictions = predictTest(network, test_dataset_loader, vector_key)
     return predictions
+    """
+
 
 if __name__ == '__main__':
     predictions = runPredictions()
-

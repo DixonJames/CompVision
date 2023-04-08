@@ -6,24 +6,15 @@ also used is a pre-trained MaskRCNN model [https://pytorch.org/vision/main/model
 on the COCO dataset [https://cocodataset.org/#home]
 """
 # from google.colab import files
-import cv2
 
-import numpy as np
-from PIL import Image
-from IPython import display
-import os
-
-import random
 import torch
-
 import torchvision
-import cv2
-import argparse
-from PIL import Image
+import cv2 as cv
 from torchvision.models.detection import MaskRCNN_ResNet50_FPN_Weights
 
 from torchvision.transforms import transforms as transforms
 
+import utils
 from utils import *
 
 # some starting constants
@@ -31,19 +22,24 @@ from utils import *
 dataset_path = "Dataset/Train"
 
 # initialize the model
-model = torchvision.models.detection.maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT, progress=True,
-                                                           num_classes=91)
+maskRCNN_model = torchvision.models.detection.maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT,
+                                                                    progress=True,
+                                                                    num_classes=91)
 # set the computation device
 # load the modle on to the computation device and set to eval mode
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model.to(device).eval()
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+maskRCNN_model.to(device).eval()
 
 HEIGHT = 720
 WIDTH = 1280
 
+img_transform = transforms.Compose([
+    transforms.ToTensor()
+])
 
 
-def get_outputs(image, model, threshold):
+def get_outputs(image, model, threshold, cpu_option=False):
     """
     modified from https://debuggercafe.com/instance-segmentation-with-pytorch-and-mask-r-cnn/
     applies the pretrained MaskRCNN model on an input image. [https://pytorch.org/vision/main/models/mask_rcnn.html]
@@ -52,9 +48,14 @@ def get_outputs(image, model, threshold):
     :param threshold:
     :return:
     """
-    with torch.no_grad():
-        # forward pass of the image through the model
-        outputs = model(image)
+    if not cpu_option:
+        with torch.no_grad():
+            # forward pass of the image through the model
+            outputs = model(image)
+    else:
+        model.to("cpu")
+        with torch.no_grad():
+            outputs = maskRCNN_model(image.to("cpu"))
 
     # get all the scores
     scores = list(outputs[0]['scores'].detach().cpu().numpy())
@@ -94,11 +95,11 @@ def draw_segmentation_map(image, masks, boxes, labels):
             return None
         image = original_image.copy()
         # convert from RGN to OpenCV BGR format
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR).astype("uint8")
+        image = cv.cvtColor(image, cv.COLOR_RGB2BGR).astype("uint8")
 
         # apply mask on the image
 
-        masked_image = cv2.bitwise_and(image, image, mask=np.uint8(masks[i] * 255).astype("uint8"))
+        masked_image = cv.bitwise_and(image, image, mask=np.uint8(masks[i] * 255).astype("uint8"))
 
         # crop by the bounding boxes around the objects
         image = image[boxes[i][0][1]:boxes[i][1][1], boxes[i][0][0]:boxes[i][1][0]]
@@ -108,13 +109,13 @@ def draw_segmentation_map(image, masks, boxes, labels):
         image = squareAspect(image, height_len=700, side_len=700)
         masked_image = squareAspect(masked_image, height_len=700, side_len=700)
 
-        images.append(cv2.cvtColor(masked_image, cv2.COLOR_BGR2RGB))
-        """cv2.imwrite(f"test_{i}.jpg", cv2.cvtColor(masked_image, cv2.COLOR_BGR2RGB))
-    cv2.imwrite(f"test_referance.jpg", cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB))"""
+        images.append(cv.cvtColor(masked_image, cv.COLOR_BGR2RGB))
+        """cv.imwrite(f"test_{i}.jpg", cv.cvtColor(masked_image, cv.COLOR_BGR2RGB))
+    cv.imwrite(f"test_referance.jpg", cv.cvtColor(original_image, cv.COLOR_BGR2RGB))"""
     return images
 
 
-def run(image, threshold=0.5):
+def runPersonExtraction(image, threshold=0.5, cpu=False):
     orig_image = image.copy()
 
     # transform the image
@@ -122,8 +123,8 @@ def run(image, threshold=0.5):
 
     # add a batch dimension
     image = image.unsqueeze(0).to(device)
-    masks, boxes, labels = get_outputs(image, model, threshold)
-    return draw_segmentation_map(orig_image, masks, boxes, labels)
+    masks, boxes, labels = get_outputs(image, maskRCNN_model, threshold, cpu)
+    return draw_segmentation_map(orig_image, masks, boxes, labels), masks, boxes, labels
 
 
 if __name__ == '__main__':
@@ -137,15 +138,19 @@ if __name__ == '__main__':
                                         framerate=15)
 
             video_name = video_file.split(".")[0].replace(" ", "_")
-            save_path = os.path.join(".", "Results", "1_1", file_loc, video_name)
-            if not os.path.exists(save_path):
-                os.makedirs(save_path)
+            patch_save_path = os.path.join(".", "Results", "1_1", file_loc, video_name)
+            frame_save_path = os.path.join("Frames", file_loc, video_name)
+
+            utils.createIfNotExist(patch_save_path)
+            utils.createIfNotExist(frame_save_path)
 
             second = 0
             for img in img_gen:
+                cv.cvtColor(img, cv.COLOR_RGB2BGR)
+                cv.imwrite(os.path.join(frame_save_path, f"{file_loc[0]}_{video_name}_{second}.jpg"),
+                           cv.cvtColor(img, cv.COLOR_RGB2BGR))
 
-                images = run(img, threshold=0.99)
-
+                images, _, _, _ = runPersonExtraction(img, threshold=0.99)
 
                 if images is not None:
                     for i in range(len(images)):
@@ -154,11 +159,10 @@ if __name__ == '__main__':
                         y_pos = (1280 - 700) // 2
                         base[x_pos:x_pos + 700, y_pos:y_pos + 700, :] = images[i]
 
-                        cv2.imwrite(os.path.join(save_path, f"{file_loc[0]}_{video_name}_{second}_{i}.jpg"), base)
+                        cv.imwrite(os.path.join(patch_save_path, f"{file_loc[0]}_{video_name}_{second}_{i}.jpg"), base)
 
-                    second += 1
                     print(f"video: {video_file}, s:{second}")
-                else:
-                    continue
+
+                second += 1
 
     print(f"processed {c} images")

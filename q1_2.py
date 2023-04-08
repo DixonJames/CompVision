@@ -30,6 +30,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 import pandas as pd
 
+
 model_weights_path = "pose_deploy_linevec.prototxt"
 model_architecture_path = "pose_iter_440000.caffemodel"
 points_save_path = "points.json"
@@ -47,13 +48,18 @@ POSE_PAIRS = [["Neck", "RShoulder"], ["Neck", "LShoulder"], ["RShoulder", "RElbo
 
 body_parts_key = {"half": 0, "head": 1, "sit": 2, "stand": 3, "other": 4}
 
-inWidth = 1280
-inHeight = 720
+inWidth = 512
+inHeight = 512
 
 inScale = 0.003922
 threshold = 0.01
 
+batch_size = 32
+
 pose_model = cv.dnn.readNet(cv.samples.findFile(model_weights_path), cv.samples.findFile(model_architecture_path))
+"""pose_model.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+pose_model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)"""
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"device: {device}")
@@ -134,7 +140,7 @@ def poseEstimation():
     finds the skeleton points of each
     :return:
     """
-    p0 = os.path.join(".", "Results", "1_1_edited")
+    p0 = os.path.join(".", "Results", "1_1")
     folders = os.listdir(p0)
     folders.reverse()
     for file_loc in folders:
@@ -145,37 +151,56 @@ def poseEstimation():
             print(video_cap_file)
 
             p2 = os.path.join(p1, video_cap_file)
+            all_images = []
+            all_images_paths = []
             for image_file in os.listdir(p2):
+                all_images_paths.append(image_file)
 
-                save_path = os.path.join(".", "Results", "1_2", file_loc, video_cap_file)
                 image = cv.imread(os.path.join(p2, image_file), cv.IMREAD_COLOR)
 
                 frameWidth, frameHeight = image.shape[1], image.shape[0]
 
-                reformatted_image = cv.dnn.blobFromImage(image, inScale, (inWidth, inHeight),
+                center_x = min(frameWidth, frameHeight)
+                center_y =min(frameWidth, frameHeight)
+
+                start_x = (frameWidth - center_x) // 2
+                start_y = (frameHeight - center_y) // 2
+
+                center_image = image[start_y:start_y + center_y, start_x:start_x + center_x]
+
+
+                all_images.append(center_image)
+
+            for i in range(0, len(all_images), batch_size):
+                img_batch = all_images[i:i + batch_size]
+                img_path_batch = all_images_paths[i:i + batch_size]
+
+                reformatted_image = cv.dnn.blobFromImages(img_batch, inScale, (inWidth, inHeight),
                                                          (0, 0, 0), swapRB=False, crop=False)
                 pose_model.setInput(reformatted_image)
                 out = pose_model.forward()
 
-                assert (len(BODY_PARTS) <= out.shape[1])
 
-                points = []
 
-                result = BODY_PARTS.copy()
-                for i in range(len(BODY_PARTS)):
-                    heatMap = out[0, i, :, :]
-                    _, conf, _, point = cv.minMaxLoc(heatMap)
-                    x = (frameWidth * point[0]) / out.shape[3]
-                    y = (frameHeight * point[1]) / out.shape[2]
+                for output_i in range(len(out)):
+                    assert (len(BODY_PARTS) <= out[output_i].shape[1])
+                    points = []
+                    result = BODY_PARTS.copy()
+                    for i in range(len(BODY_PARTS)):
+                        heatMap = out[output_i, i, :, :]
+                        _, conf, _, point = cv.minMaxLoc(heatMap)
+                        x = (center_x * point[0]) / out.shape[3]
+                        y = (center_x * point[1]) / out.shape[2]
 
-                    points.append((int(x), int(y)) if conf > threshold else (0, 0))
-                    result[(list(BODY_PARTS.keys()))[i]] = (int(x), int(y))
+                        points.append((int(x), int(y)) if conf > threshold else (0, 0))
+                        result[(list(BODY_PARTS.keys()))[i]] = (int(x), int(y))
 
-                labeled = poseImage(image, points)
-                save_name = file_loc[0] + "_" + image_file
-                saveIMG(labeled, save_name, save_path)
+                    labeled = poseImage(img_batch[output_i], points)
+                    save_name = img_path_batch[output_i]
+                    save_path = os.path.join(".", "Results", "1_2", file_loc)
+                    saveIMG(labeled, save_name, save_path)
 
-                savePoints(result, save_name, points_save_path)
+                    savePoints(result, save_name, points_save_path)
 
 
 def load_parts(labels_path, vectors_path):

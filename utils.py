@@ -1,10 +1,11 @@
 # from google.colab import files
 import cv2 as cv
-
+import random
 import numpy as np
 from PIL import Image
 from IPython import display
 import os
+import matplotlib.pyplot as plt
 
 d = display.display(None, display_id=True)
 
@@ -78,7 +79,33 @@ def squareAspect(image, height_len, side_len):
     return np.array(image)
 
 
+def createIfNotExist(path):
+    folders = path.split('/')
+    current_path =""
+    for f in folders:
+        current_path = os.path.join(current_path, f)
+        if not os.path.exists(current_path):
+            os.mkdir(current_path)
+
+
+def getRandomImges(n, path):
+    all_imgs = []
+    for file in os.listdir(path):
+        for img_path in os.listdir(os.path.join(path, file)):
+            all_imgs.append(os.path.join(path, file, img_path))
+
+    return random.sample(all_imgs, n)
+
+
+def displayImg(img):
+    plt.figure(figsize=(12, 12))
+    for i in range(1):
+        plt.subplot(1, 1, i + 1)
+        plt.imshow(img)
+        plt.axis('off')
+    plt.show()
+
+
 def saveIMG(image, name, save_path):
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
+    createIfNotExist(save_path)
     cv.imwrite(os.path.join(save_path, name), image)

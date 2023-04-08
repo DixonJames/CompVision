@@ -19,7 +19,6 @@ from sklearn.model_selection import train_test_split
 import tensorflow as tf
 
 
-
 def getDatasets(path, split=0.2):
     label_key = {"Game": 0, "Movie": 1}
 
@@ -80,20 +79,26 @@ def preprocess_image_test(image):
 
 def loadTrainImage(filepath):
     img = cv.imread(filepath)
-    # Convert BGR image to RGB
     img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
     img = tf.convert_to_tensor(img, dtype=tf.float32)
     img = tf.image.convert_image_dtype(img, tf.float32)
     img = tf.image.resize(img, [256, 256])
+
     img = preprocess_image_train(img)
     return img
 
 
-def loadTestImage(filepath):
-    img = tf.io.read_file(filepath)
-    img = tf.image.decode_jpeg(img, channels=3)
+def loadTestImage(input, resize=True, convert=False, reseize_dim=256):
+    if not convert:
+        img = cv.imread(input)
+    else:
+        img = input
+    img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+    img = tf.convert_to_tensor(img, dtype=tf.float32)
     img = tf.image.convert_image_dtype(img, tf.float32)
-    img = tf.image.resize(img, [256, 256])
+    if resize:
+        img = tf.image.resize(img, [reseize_dim, reseize_dim])
+
     img = preprocess_image_test(img)
     return img
 
@@ -127,9 +132,10 @@ def DataSetloaders(path, batch_size=32, lim_size=0):
     (game_train_filepaths, game_test_filepaths), (movie_train_filepaths, movie_test_filepaths) = getDatasets(
         path)
 
-    if lim_size!=0:
-        game_train_filepaths, game_test_filepaths, movie_train_filepaths, movie_test_filepaths =\
-        game_train_filepaths[:lim_size], game_test_filepaths[:lim_size], movie_train_filepaths[:lim_size], movie_test_filepaths[:lim_size]
+    if lim_size != 0:
+        game_train_filepaths, game_test_filepaths, movie_train_filepaths, movie_test_filepaths = \
+            game_train_filepaths[:lim_size], game_test_filepaths[:lim_size], movie_train_filepaths[
+                                                                             :lim_size], movie_test_filepaths[:lim_size]
     game_train_ds = tfDatasetGen(game_train_filepaths, train=True, batch_size=batch_size)
     game_test_ds = tfDatasetGen(game_train_filepaths, train=False, batch_size=batch_size)
 
@@ -138,11 +144,11 @@ def DataSetloaders(path, batch_size=32, lim_size=0):
 
     return game_train_ds, game_test_ds, movie_train_ds, movie_test_ds
 
+
 def tensor2Image(tensor):
-    return cv.cvtColor((tensor.numpy()* 0.5 + 0.5) *255, cv.COLOR_RGB2BGR)
+    return cv.cvtColor((tensor.numpy() * 0.5 + 0.5) * 255, cv.COLOR_RGB2BGR)
+
 
 if __name__ == '__main__':
     game_train_filepaths, game_test_filepaths, movie_train_filepaths, movie_test_filepaths = DataSetloaders(
         "Results/1_1_edited", 32)
-
-

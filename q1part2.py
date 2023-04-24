@@ -407,7 +407,7 @@ def predictTest(model, testIterator, vector_key):
 def runPredictions():
     # create the points.json file of each of the joint locations (and optionally the images displaying them)
 
-    poseEstimation()
+    #poseEstimation()
 
     # creates the labels.json file (submitted with CW)
     # this tuned on my manually labeled dataset of the images into labels to train on
@@ -423,27 +423,27 @@ def runPredictions():
     """
 
     # create network
-    """
+    #"""
     network = ActionNetwork()
     network.to(device)
-    """
+    #"""
 
     # get loss function and optimiser
-    """
+    #"""
     loss_func = nn.CrossEntropyLoss()
     optimizer = optim.Adam(network.parameters(), lr=0.002, betas=(0.9, 0.999))
-    """
+    #"""
 
     # train model
-    """
+    #"""
     test_acc, model = trainModel(network, optimizer, loss_func,train_dataset_loader, test_dataset_loader, accuracy_stagnation=14)
-    """
+    #"""
 
     # predict all test set
-    """
+    #"""
     predictions = predictTest(network, test_dataset_loader, vector_key)
     return predictions
-    """
+    #"""
 
 
 if __name__ == '__main__':

@@ -85,7 +85,7 @@ def get_outputs(image, model, threshold, cpu_option=False):
     return masks, boxes, labels
 
 
-def draw_segmentation_map(image, masks, boxes, labels):
+def draw_segmentation_map(image, masks, boxes, labels, square=True):
     # convert the original PIL image into NumPy format
     original_image = np.array(image)
 
@@ -106,8 +106,9 @@ def draw_segmentation_map(image, masks, boxes, labels):
         masked_image = masked_image[boxes[i][0][1]:boxes[i][1][1], boxes[i][0][0]:boxes[i][1][0]]
 
         # fix the aspect ratio to a square for each
-        image = squareAspect(image, height_len=700, side_len=700)
-        masked_image = squareAspect(masked_image, height_len=700, side_len=700)
+        if square:
+            image = squareAspect(image, height_len=700, side_len=700)
+            masked_image = squareAspect(masked_image, height_len=700, side_len=700)
 
         images.append(cv.cvtColor(masked_image, cv.COLOR_BGR2RGB))
         """cv.imwrite(f"test_{i}.jpg", cv.cvtColor(masked_image, cv.COLOR_BGR2RGB))
@@ -115,7 +116,7 @@ def draw_segmentation_map(image, masks, boxes, labels):
     return images
 
 
-def runPersonExtraction(image, threshold=0.5, cpu=False):
+def runPersonExtraction(image, threshold=0.5, cpu=False, square=True):
     orig_image = image.copy()
 
     # transform the image
@@ -124,7 +125,7 @@ def runPersonExtraction(image, threshold=0.5, cpu=False):
     # add a batch dimension
     image = image.unsqueeze(0).to(device)
     masks, boxes, labels = get_outputs(image, maskRCNN_model, threshold, cpu)
-    return draw_segmentation_map(orig_image, masks, boxes, labels), masks, boxes, labels
+    return draw_segmentation_map(orig_image, masks, boxes, labels, square=square), masks, boxes, labels
 
 
 if __name__ == '__main__':

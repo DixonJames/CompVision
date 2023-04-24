@@ -19,7 +19,7 @@ import utils
 import numpy as np
 # from q1_1 import *
 
-# AUTOTUNE = tf.data.AUTOTUNE
+from PIL import Image
 
 BUFFER_SIZE = 1000
 BATCH_SIZE = 1
@@ -273,68 +273,82 @@ def q2_2():
                   checkpoint_path=os.path.join(os.getcwd(), "checkpoints/train"),
                   training_ds="Results/1_1")
 
-    from q1_1 import runPersonExtraction
+    from q1part1 import runPersonExtraction
 
     # for now just a few random game frames
-    random_game_frame_paths = utils.getRandomImges(10, "Frames/Game")
+    frames = utils.videoImgGenerator("Dataset/Test/Test Movie.mp4", framerate=0)
     frame_num = 0
-    for img_path in random_game_frame_paths:
-        image = cv.imread(img_path)
+    for frame in frames:
+        image = frame
         # convert to patch
-        patch_images, masks, boxes, labels = runPersonExtraction(image, threshold=0.99, cpu=True)
+        patch_images, masks, boxes, labels = runPersonExtraction(image, threshold=0.99, cpu=True, square=True)
 
         if patch_images is None:
             continue
 
         work_canvas = image
+        blanc_canvas = np.zeros((360, 480, 3), dtype=np.uint8)
+        # blanc_canvas = np.zeros((1280, 720, 3), dtype=np.uint8)
+        # goes though all the found human patches
+        op = 1
+        smaller = "width"
         for (patch, mask, box) in zip(patch_images, masks, boxes):
-            converted_patch = cg.movie2game(img_path=None, img_tensor=patch)
-            converted_patch = np.transpose(converted_patch, (1, 0, 2))
-            actual_width, actual_height = box[1][1] - box[0][1], box[1][0] - box[0][0]
 
-            # reseize to the square to the max of both dims
-            # this ensires that we have the larger of the sides to the correct size
+            # convert patch style
+            converted_patch = cg.movie2game(img_path=None, img_tensor=patch)
+            # converted_patch = np.transpose(converted_patch, (1, 0, 2))
+            actual_height, actual_width = box[1][1] - box[0][1], box[1][0] - box[0][0]
+
+            # resize to the square to the max of both dims
+            # this ensures that we have the larger of the sides to the correct size
             resize_dim = max(actual_height, actual_width)
             converted_patch = cv.resize(converted_patch, (resize_dim, resize_dim))
 
             if resize_dim != actual_width:
-                smaller = "width"
-                x_start = resize_dim//2 - actual_width // 2
+
+                x_start = resize_dim // 2 - actual_width // 2
                 x_end = x_start + actual_width
 
                 converted_patch = converted_patch[:, x_start:x_end]
             else:
                 smaller = "height"
 
-                y_start = resize_dim//2 - (actual_height // 2)
+                y_start = resize_dim // 2 - (actual_height // 2)
                 y_end = y_start + actual_height
 
                 converted_patch = converted_patch[y_start:y_end, :]
 
-            blanc_canvas = np.zeros((1280, 720, 3), dtype=np.uint8)
-            x, y = box[0]
+            # put resized and style transferred patch over background of original image
+
+            # converted_patch = np.transpose(converted_patch, (1, 0, 2))
+            #utils.saveIMG(converted_patch, f"cp.jpg", "Results/2_2")
+
+            px1, py1 = box[0]
+            px2, py2 = box[1]
+
+            fx1, fy1 = px1, py2 - (px2 - px1)
+            fx2, fy2 = px1 + py2 - py1, py2
             height, width, channels = converted_patch.shape
-            blanc_canvas[  x:x + height, y:y + width] = converted_patch
+
+            if blanc_canvas[py1:py2, px1:px2].shape == converted_patch.shape:
+                blanc_canvas[py1:py2, px1:px2] = converted_patch
 
             blanc_canvas = np.transpose(blanc_canvas, (1, 0, 2))
 
-            mask = mask.astype(np.uint8)   # Convert C to float and normalize to [0, 1]
+            mask = mask.astype(np.uint8)
 
             D = cv.distanceTransform(mask, cv.DIST_L2, 5)
-            D = np.clip(D/15, 0, 1)
+            D = np.clip(D / 15, 0, 1)
             D = np.stack([D, D, D], axis=2)
 
             # Broadcast A and B over the distance transform D
-            work_canvas = (1 - D) * work_canvas + D * blanc_canvas
+            work_canvas = (1 - D) * work_canvas + D * np.transpose(blanc_canvas, (1, 0, 2))
 
-
-            """result[mask] = blanc_canvas[mask]
-            result[D] = work_canvas[D]
-            work_canvas = result"""
+        work_canvas = cv.cvtColor(work_canvas, cv.COLOR_RGB2BGR)
         utils.saveIMG(work_canvas, f"conv_frame_{frame_num}.jpg", "Results/2_2")
-        frame_num+=1
 
-
+        converted_frame = work_canvas
+        frame_num += 1
 
 
 if __name__ == '__main__':

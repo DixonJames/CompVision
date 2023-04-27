@@ -81,7 +81,7 @@ def squareAspect(image, height_len, side_len):
 
 def createIfNotExist(path):
     folders = path.split('/')
-    current_path =""
+    current_path = ""
     for f in folders:
         current_path = os.path.join(current_path, f)
         if not os.path.exists(current_path):
@@ -92,9 +92,33 @@ def getRandomImges(n, path):
     all_imgs = []
     for file in os.listdir(path):
         for img_path in os.listdir(os.path.join(path, file)):
-            all_imgs.append(os.path.join(path, file, img_path))
+            if img_path.split(".")[-1] == "jpg":
+                all_imgs.append(os.path.join(path, file, img_path))
+            else:
+                for img in os.listdir(os.path.join(path, file, img_path)):
+                    all_imgs.append(os.path.join(path, file, img_path, img))
 
     return random.sample(all_imgs, n)
+
+
+def displayRandom(n, path):
+    random_paths = getRandomImges(n, path)
+    for i, img_path in enumerate(random_paths):
+        plt.figure(figsize=(12, 12))
+        img = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2RGB)
+        plt.title(f"Random image {i}")
+        plt.imshow(img)
+        plt.axis('off')
+        plt.show()
+
+
+def displayPicture(path, title):
+    plt.figure(figsize=(12, 12))
+    img = cv.cvtColor(cv.imread(path), cv.COLOR_BGR2RGB)
+    plt.title(f"{title}")
+    plt.imshow(img)
+    plt.axis('off')
+    plt.show()
 
 
 def displayImg(img):
@@ -109,3 +133,13 @@ def displayImg(img):
 def saveIMG(image, name, save_path):
     createIfNotExist(save_path)
     cv.imwrite(os.path.join(save_path, name), image)
+
+def find_files(filename, search_path):
+    """
+    modified from [https://www.tutorialspoint.com/file-searching-using-python]
+    """
+    result = []
+    for root, dir, files in os.walk(search_path):
+        if filename in files:
+            result.append(os.path.join(root, filename))
+    return result

@@ -20,6 +20,8 @@ import numpy as np
 import argparse
 import os
 import json
+
+import utils
 from utils import *
 
 from sklearn.datasets import make_classification
@@ -29,7 +31,6 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 import pandas as pd
-
 
 model_weights_path = "pose_deploy_linevec.prototxt"
 model_architecture_path = "pose_iter_440000.caffemodel"
@@ -47,6 +48,7 @@ POSE_PAIRS = [["Neck", "RShoulder"], ["Neck", "LShoulder"], ["RShoulder", "RElbo
               ["REye", "REar"], ["Nose", "LEye"], ["LEye", "LEar"]]
 
 body_parts_key = {"half": 0, "head": 1, "sit": 2, "stand": 3, "other": 4}
+body_index_value = ["half", "head", "sit", "stand", "other"]
 
 inWidth = 512
 inHeight = 512
@@ -60,8 +62,8 @@ pose_model = cv.dnn.readNet(cv.samples.findFile(model_weights_path), cv.samples.
 """pose_model.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
 pose_model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)"""
 
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 print(f"device: {device}")
 
 
@@ -161,13 +163,12 @@ def poseEstimation():
                 frameWidth, frameHeight = image.shape[1], image.shape[0]
 
                 center_x = min(frameWidth, frameHeight)
-                center_y =min(frameWidth, frameHeight)
+                center_y = min(frameWidth, frameHeight)
 
                 start_x = (frameWidth - center_x) // 2
                 start_y = (frameHeight - center_y) // 2
 
                 center_image = image[start_y:start_y + center_y, start_x:start_x + center_x]
-
 
                 all_images.append(center_image)
 
@@ -176,11 +177,9 @@ def poseEstimation():
                 img_path_batch = all_images_paths[i:i + batch_size]
 
                 reformatted_image = cv.dnn.blobFromImages(img_batch, inScale, (inWidth, inHeight),
-                                                         (0, 0, 0), swapRB=False, crop=False)
+                                                          (0, 0, 0), swapRB=False, crop=False)
                 pose_model.setInput(reformatted_image)
                 out = pose_model.forward()
-
-
 
                 for output_i in range(len(out)):
                     assert (len(BODY_PARTS) <= out[output_i].shape[1])
@@ -233,7 +232,7 @@ def load_parts(labels_path, vectors_path):
         if img_name in list(labels.keys()):
             label = body_parts_key[labels[img_name]]
         else:
-            label = 5
+            label = 4
 
         labels_results.append(label)
         vectors_results.append(vec)
@@ -398,53 +397,154 @@ def predictTest(model, testIterator, vector_key):
 
     classes_prediction_selection = []
     for class_label in range(5):
-        selected_label = list((results[results["prediction"] == class_label].sample(10, replace=False))["img"])
+        class_predictions = results[results["prediction"] == class_label]
+        selected_label = list(
+            (results[results["prediction"] == class_label].sample(min(len(class_predictions), 10), replace=False))[
+                "img"])
         classes_prediction_selection.append(selected_label)
 
     return classes_prediction_selection
 
 
+def displayPredictions(predictions, original_images_path=os.path.join(".", "Results", "1_1")):
+    i = 0
+    for cls_list in predictions:
+        label = body_index_value[i]
+        for img_path in cls_list:
+            # full_img_path = os.path.join(original_images_path, utils.find_files(img_path, original_images_path))
+            utils.displayPicture(path=utils.find_files(img_path, original_images_path)[0], title=label)
+        i += 1
+
+
 def runPredictions():
     # create the points.json file of each of the joint locations (and optionally the images displaying them)
 
-    #poseEstimation()
+    # poseEstimation()
 
     # creates the labels.json file (submitted with CW)
     # this tuned on my manually labeled dataset of the images into labels to train on
     # this doesn't have to be run when part of the submission as labels.json is already included in the submission.
 
-    """createLabels()"""
+    # createLabels()
 
     current_epoch = 0
 
     # create the dataset to train the model
-    """
+
     train_dataset_loader, test_dataset_loader, vector_key = getDataset("labels.json", "points.json")
-    """
 
     # create network
-    #"""
+    # """
     network = ActionNetwork()
     network.to(device)
-    #"""
+    # """
 
     # get loss function and optimiser
-    #"""
+    # """
     loss_func = nn.CrossEntropyLoss()
     optimizer = optim.Adam(network.parameters(), lr=0.002, betas=(0.9, 0.999))
-    #"""
+    # """
 
     # train model
-    #"""
-    test_acc, model = trainModel(network, optimizer, loss_func,train_dataset_loader, test_dataset_loader, accuracy_stagnation=14)
-    #"""
+    # """
+    test_acc, model = trainModel(network, optimizer, loss_func, train_dataset_loader, test_dataset_loader,
+                                 accuracy_stagnation=5)
+    # """
 
     # predict all test set
-    #"""
+    # """
     predictions = predictTest(network, test_dataset_loader, vector_key)
     return predictions
-    #"""
+    # """
+
+
+def genQ13Images(results_path, img_path=os.path.join(".", "Results", "1_1"), threshold=0.5):
+    """
+    goes though all the reults of part 1_1
+    finds the skeleton points of each
+    returns the image to dataset IF contains enough human surfice area
+    :return:
+    """
+    p0 = os.path.join(".", "Results", "1_1")
+    folders = os.listdir(p0)
+    folders.reverse()
+    for file_loc in folders:
+        print(file_loc)
+
+        p1 = os.path.join(p0, file_loc)
+        for video_cap_file in os.listdir(p1):
+            print(video_cap_file)
+
+            p2 = os.path.join(p1, video_cap_file)
+            all_images = []
+            all_images_paths = []
+            for image_file in os.listdir(p2):
+                all_images_paths.append(image_file)
+
+                image = cv.imread(os.path.join(p2, image_file), cv.IMREAD_COLOR)
+
+                frameWidth, frameHeight = image.shape[1], image.shape[0]
+
+                center_x = min(frameWidth, frameHeight)
+                center_y = min(frameWidth, frameHeight)
+
+                start_x = (frameWidth - center_x) // 2
+                start_y = (frameHeight - center_y) // 2
+
+                center_image = image[start_y:start_y + center_y, start_x:start_x + center_x]
+
+                all_images.append(center_image)
+
+            for i in range(0, len(all_images), batch_size):
+                img_batch = all_images[i:i + batch_size]
+                img_path_batch = all_images_paths[i:i + batch_size]
+
+                reformatted_image = cv.dnn.blobFromImages(img_batch, inScale, (inWidth, inHeight),
+                                                          (0, 0, 0), swapRB=False, crop=False)
+                pose_model.setInput(reformatted_image)
+                out = pose_model.forward()
+
+                for output_i in range(len(out)):
+                    assert (len(BODY_PARTS) <= out[output_i].shape[1])
+                    points = []
+                    result = BODY_PARTS.copy()
+
+                    found_parts = 0
+                    for i in range(len(BODY_PARTS)):
+                        heatMap = out[output_i, i, :, :]
+                        _, conf, _, point = cv.minMaxLoc(heatMap)
+                        x = (center_x * point[0]) / out.shape[3]
+                        y = (center_x * point[1]) / out.shape[2]
+
+                        if conf > threshold:
+                            points.append((int(x), int(y)))
+                            found_parts += 1
+                        else:
+                            points.append((0, 0))
+                        result[(list(BODY_PARTS.keys()))[i]] = (int(x), int(y))
+
+                    if found_parts >= int(len(BODY_PARTS) * threshold):
+                        save_name = img_path_batch[output_i]
+                        save_path = os.path.join(".", "Results", "1_3", file_loc)
+                        saveIMG(img_batch[output_i], save_name, save_path)
+
+
+def q13(img_path, results_path, threshold=0.5):
+    """genQ13Images(results_path=results_path,
+                 img_path=img_path,
+                 threshold=threshold)"""
+    displayRandom(50, path=os.path.join(".", "Results", "1_3"))
+
+
+def q12():
+    predictions = runPredictions()
+    displayPredictions(predictions, original_images_path=os.path.join(".", "Results", "1_1"))
 
 
 if __name__ == '__main__':
-    predictions = runPredictions()
+    # q1.3
+    """q13(results_path=os.path.join(".", "Results", "1_3"),
+        img_path=os.path.join(".", "Results", "1_1"),
+        threshold=threshold)"""
+    # q1.2
+    q12()

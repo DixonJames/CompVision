@@ -128,18 +128,18 @@ def runPersonExtraction(image, threshold=0.5, cpu=False, square=True):
     return draw_segmentation_map(orig_image, masks, boxes, labels, square=square), masks, boxes, labels
 
 
-if __name__ == '__main__':
+def processVideos(ds_path, results_path):
     img_transform = transforms.Compose([
         transforms.ToTensor()
     ])
     c = 0
-    for file_loc in os.listdir(os.path.join(".", "Dataset", "Train")):
-        for video_file in os.listdir(os.path.join(".", "Dataset", "Train", file_loc)):
-            img_gen = videoImgGenerator(video_path=os.path.join(".", "Dataset", "Train", file_loc, video_file),
+    for file_loc in os.listdir(ds_path):
+        for video_file in os.listdir(os.path.join(ds_path, file_loc)):
+            img_gen = videoImgGenerator(video_path=os.path.join(ds_path, file_loc, video_file),
                                         framerate=15)
 
             video_name = video_file.split(".")[0].replace(" ", "_")
-            patch_save_path = os.path.join(".", "Results", "1_1", file_loc, video_name)
+            patch_save_path = os.path.join(results_path, "1_1", file_loc, video_name)
             frame_save_path = os.path.join("Frames", file_loc, video_name)
 
             utils.createIfNotExist(patch_save_path)
@@ -167,3 +167,11 @@ if __name__ == '__main__':
                 second += 1
 
     print(f"processed {c} images")
+
+
+def q11():
+    processVideos(ds_path=os.path.join(".", "Dataset", "Train"), results_path=os.path.join(".", "Results", "1_1"))
+    utils.displayRandom(50, path=os.path.join(".", "Results", "1_1"))
+
+if __name__ == '__main__':
+    q11()

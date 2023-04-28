@@ -151,4 +151,4 @@ def tensor2Image(tensor):
 
 if __name__ == '__main__':
     game_train_filepaths, game_test_filepaths, movie_train_filepaths, movie_test_filepaths = DataSetloaders(
-        "Results/1_1_edited", 32)
+        "Results/1_1", 32)

@@ -62,8 +62,8 @@ pose_model = cv.dnn.readNet(cv.samples.findFile(model_weights_path), cv.samples.
 """pose_model.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
 pose_model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)"""
 
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = "cpu"
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#device = "cpu"
 print(f"device: {device}")
 
 

@@ -68,8 +68,9 @@ class CycleGAN:
 
         self.checkpoint_path = checkpoint_path
 
-        self.game_train_loader, self.game_test_loader, self.movie_train_loader, self.movie_test_loader = GAN_data_loader.DataSetloaders(
-            training_ds, batch_size=self.BATCH_SIZE, lim_size=self.lim_ds_size)
+        if training_ds is not None:
+            self.game_train_loader, self.game_test_loader, self.movie_train_loader, self.movie_test_loader = GAN_data_loader.DataSetloaders(
+                training_ds, batch_size=self.BATCH_SIZE, lim_size=self.lim_ds_size)
 
         # cv.imwrite(os.path.join(f"movie_train.jpg"), GAN_data_loader.tensor2Image(sample_movie[0]))
 
@@ -126,6 +127,17 @@ class CycleGAN:
             self.ckpt.restore(self.ckpt_manager.latest_checkpoint)
             print('Latest checkpoint restored!!')
 
+    def prepareImg(self, img):
+        img_tensor = GAN_data_loader.loadTestImage(img, resize=True, convert=True)
+        expandede_img_tensor = tf.expand_dims(img_tensor, axis=0)
+        return expandede_img_tensor
+
+    def runMovie2Game(self, preparedTensor):
+        preidcted_tensor = self.generator_g(preparedTensor)
+
+        preidcted_tensor = ((preidcted_tensor.numpy() + 1) / 2) * 255
+        return preidcted_tensor
+
     def movie2game(self, img_path, img_tensor=None):
         # Generator G translates X -> Y, movies to games
         # Generator F translates Y -> X, games to movies
@@ -137,10 +149,7 @@ class CycleGAN:
         expandede_img_tensor = tf.expand_dims(img_tensor, axis=0)
         repeited_img_tensor = tf.repeat(expandede_img_tensor, axis=0, repeats=16)
 
-        preidcted_tensor = self.generator_g(repeited_img_tensor)
-
-        preidcted_tensor = ((preidcted_tensor[0].numpy() + 1) / 2) * 255
-        return preidcted_tensor
+        return self.runMovie2Game(repeited_img_tensor)[0]
 
     def discriminator_loss(self, real, generated):
         real_loss = self.loss_obj(tf.ones_like(real), real)
@@ -449,11 +458,11 @@ def q2_2():
         frame_num += 1
 
 
-def q2_1(model_checkpoint, vid_path, save_path):
+def q2_1(model_checkpoint, vid_path, save_path, batch_size=16):
     cg = CycleGAN(lim_ds_size=0,
                   BATCH_SIZE=16,
-                  checkpoint_path=os.path.join(os.getcwd(), "checkpoints", "q2_1_train"),
-                  training_ds="Results/1_1",
+                  checkpoint_path=model_checkpoint,
+                  training_ds=None,
                   IMG_WIDTH=IMG_WIDTH,
                   IMG_HEIGHT=IMG_HEIGHT)
 
@@ -461,39 +470,85 @@ def q2_1(model_checkpoint, vid_path, save_path):
 
     # for now just a few random game frames
     frames = utils.videoImgGenerator("Dataset/Test/Test Movie.mp4", framerate=0)
-    frame_num = 0
+    batch_num = 0
+
+    batch = []
     for frame in frames:
         original_height, original_width = frame.shape[:2]
         resized_square_frame = cv.resize(frame, (256, 256), interpolation=cv.INTER_LINEAR)
-        converted_resized_square_frame = cg.movie2game(img_path=None, img_tensor=resized_square_frame)
-        converted_frame = cv.resize(converted_resized_square_frame, (original_width, original_height),
-                                    interpolation=cv.INTER_CUBIC)
+        prepared = cg.prepareImg(resized_square_frame)
+        batch.append(prepared[0])
 
-        cv.imwrite(os.path.join("Frames", "Test", "2_1", f"conv_frame_{frame_num}.jpg"), converted_frame)
+        if len(batch) == batch_size:
+            converted_resized_square_frame = cg.runMovie2Game(tf.stack(batch))
 
-        print(frame_num)
+            frame_num = 0
+            for frame in converted_resized_square_frame:
+                converted_frame = cv.resize(frame, (original_width, original_height),
+                                             interpolation=cv.INTER_CUBIC)
+                cv.imwrite(os.path.join(save_path, f"conv_frame_{100*batch_num + frame_num}.jpg"), converted_frame)
+                frame_num += 1
 
-        frame_num += 1
+            print(batch_num)
+
+            batch_num += 1
+            batch = []
 
 
-def q2_1_train():
+def q2_1_train(epochs=20, checkpoint_path=os.path.join(os.getcwd(), "checkpoints", "q2_1_train")):
     cg = CycleGAN(lim_ds_size=16, BATCH_SIZE=16, IMG_WIDTH=480, IMG_HEIGHT=360,
-                  checkpoint_path=os.path.join(os.getcwd(), "checkpoints", "q2_1_train"),
-                  training_ds="Frames", FID_save_path="Results/2_1/FID.json")
+                  checkpoint_path=checkpoint_path,
+                  training_ds="Frames", FID_save_path="Results/2_1/FID.json", EPOCHS=epochs)
     cg.mainTrain()
 
 
-def q2_2_train():
+def q2_2_train(epochs=20, checkpoint_path=os.path.join(os.getcwd(), "checkpoints", "q2_2_train")):
     cg = CycleGAN(lim_ds_size=16, BATCH_SIZE=16,
-                  checkpoint_path=os.path.join(os.getcwd(), "checkpoints", "q2_2_train"),
-                  training_ds="Results/1_1")
+                  checkpoint_path=checkpoint_path,
+                  training_ds="Results/1_1", EPOCHS=epochs)
     cg.mainTrain()
 
+def frame2Vid(path, title):
+    """
+    takes a path fo images, orders by frame number and creates a video
+    :param path:
+    :return:
+    """
+    output_video = f"{path}/{title}.mp4"
+
+    fps = 25
+    frame_size = (480, 360)
+    fourcc = cv.VideoWriter_fourcc(*'mp4v')
+    video_writer = cv.VideoWriter(output_video, fourcc, fps, frame_size)
+
+    frame_paths = []
+    for filename in sorted(os.listdir(path)):
+        if filename.endswith(".jpg"):
+            filepath = os.path.join(path, filename)
+            frame_paths.append(filepath)
+
+    frame_paths.sort(key=lambda x: int(x.split(".")[0].split("_")[-1]))
+
+    for pth in frame_paths:
+        frame = cv.imread(pth)
+        video_writer.write(frame)
+
+    video_writer.release()
 
 if __name__ == '__main__':
-    # q2_2()
+    # train models
     q2_1_train()
-    # q2_1()
+    # create video frames
+    # create videos
+    utils.frame2Vid("Results/2_1", "a_wholeFrame_video")
+    utils.frame2Vid("Results/2_2", "a_patch_video")
+    #q2_2()
+    #q2_1_train()
+
+    """q2_1(model_checkpoint=os.path.join(os.getcwd(), "checkpoints", "q2_1_train"),
+         save_path="Results/2_1",
+         vid_path="Dataset/Test/Test Movie.mp4")"""
+
     """cg = CycleGAN(lim_ds_size=16, checkpoint_path=os.path.join(os.getcwd(), "checkpoints", "trai"))
 
     random_movie_frame_paths = utils.getRandomImges(10, "Results/1_1/Movie")

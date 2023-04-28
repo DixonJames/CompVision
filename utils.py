@@ -38,7 +38,7 @@ def arrayToImg(array, dispaly_img=False):
     return img
 
 
-def videoImgGenerator(video_path, framerate=30):
+def videoImgGenerator(video_path, framerate=30, batches=32):
     cap = cv.VideoCapture(video_path)
     ret = True
     c = 0
@@ -143,3 +143,30 @@ def find_files(filename, search_path):
         if filename in files:
             result.append(os.path.join(root, filename))
     return result
+
+def frame2Vid(path, title):
+    """
+    takes a path fo images, orders by frame number and creates a video
+    :param path:
+    :return:
+    """
+    output_video = f"{path}/{title}.mp4"
+
+    fps = 25
+    frame_size = (480, 360)
+    fourcc = cv.VideoWriter_fourcc(*'mp4v')
+    video_writer = cv.VideoWriter(output_video, fourcc, fps, frame_size)
+
+    frame_paths = []
+    for filename in sorted(os.listdir(path)):
+        if filename.endswith(".jpg"):
+            filepath = os.path.join(path, filename)
+            frame_paths.append(filepath)
+
+    frame_paths.sort(key=lambda x: int(x.split(".")[0].split("_")[-1]))
+
+    for pth in frame_paths:
+        frame = cv.imread(pth)
+        video_writer.write(frame)
+
+    video_writer.release()

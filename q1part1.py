@@ -129,6 +129,13 @@ def runPersonExtraction(image, threshold=0.5, cpu=False, square=True):
 
 
 def processVideos(ds_path, results_path):
+    """
+    create the frames saved to the directory
+    create human patches saved to directory
+    :param ds_path:
+    :param results_path:
+    :return:
+    """
     img_transform = transforms.Compose([
         transforms.ToTensor()
     ])
